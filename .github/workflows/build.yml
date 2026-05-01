@@ -12,16 +12,8 @@ jobs:
         include:
           - os: macos-latest
             platform: darwin
-            arch: arm64
-            runner: macos-latest-arm64
-          - os: macos-latest
-            platform: darwin
-            arch: x64
-            runner: macos-latest
           - os: windows-latest
             platform: win32
-            arch: x64
-            runner: windows-latest
 
     runs-on: ${{ matrix.os }}
 
