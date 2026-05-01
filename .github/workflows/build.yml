@@ -11,18 +11,18 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: ubuntu-latest
-            platform: linux
-            arch: x64
-          - os: macos-latest
-            platform: darwin
-            arch: x64
           - os: macos-latest
             platform: darwin
             arch: arm64
+            runner: macos-latest-arm64
+          - os: macos-latest
+            platform: darwin
+            arch: x64
+            runner: macos-latest
           - os: windows-latest
             platform: win32
             arch: x64
+            runner: windows-latest
 
     runs-on: ${{ matrix.os }}
 
@@ -32,27 +32,17 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
           cache: 'npm'
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Build Electron app (macOS arm64)
-        if: matrix.platform == 'darwin' && matrix.arch == 'arm64'
+      - name: Build Electron app (macOS)
+        if: matrix.platform == 'darwin'
         run: npm run dist:mac
         env:
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-
-      - name: Build Electron app (macOS x64)
-        if: matrix.platform == 'darwin' && matrix.arch == 'x64'
-        run: npm run dist:mac
-        env:
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          CSC_IDENTITY_AUTO_DISCOVERY: false
 
       - name: Build Electron app (Windows)
         if: matrix.platform == 'win32'
