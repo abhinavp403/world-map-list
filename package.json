@@ -1,0 +1,60 @@
+{
+  "name": "worldmap",
+  "version": "1.0.0",
+  "description": "Interactive world map with country info and pronunciation",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "icon": "python3 scripts/create_icon.py && bash scripts/build_icons.sh",
+    "dist:mac": "electron-builder --mac",
+    "dist:win": "electron-builder --win",
+    "dist": "electron-builder --mac --win"
+  },
+  "keywords": [],
+  "author": "Abhinav",
+  "license": "ISC",
+  "type": "commonjs",
+  "build": {
+    "appId": "com.abhinavp.worldmap",
+    "productName": "World Map",
+    "copyright": "Copyright © 2026 Abhinav",
+    "asar": false,
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "index.html",
+      "vendor/d3.min.js",
+      "vendor/topojson-client.min.js",
+      "vendor/countries-110m.json"
+    ],
+    "mac": {
+      "category": "public.app-category.reference",
+      "target": [
+        { "target": "dmg", "arch": ["arm64"] },
+        { "target": "dmg", "arch": ["x64"] }
+      ]
+    },
+    "dmg": {
+      "title": "World Map"
+    },
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  },
+  "devDependencies": {
+    "electron": "^41.3.0",
+    "electron-builder": "^26.8.1",
+    "d3": "^7.9.0",
+    "topojson-client": "^3.1.0",
+    "world-atlas": "^2.0.2"
+  }
+}

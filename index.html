@@ -1,0 +1,1070 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World Map</title>
+<script src="./vendor/d3.min.js"></script>
+<script src="./vendor/topojson-client.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  /* ── Dark theme (default) ── */
+  :root {
+    --bg-app: #080c18;
+    --bg-header: #0d1225;
+    --bg-panel: #111827;
+    --bg-card: #161e2e;
+    --bg-row-hover: #1a2540;
+    --accent: #4f8ef7;
+    --accent-dim: rgba(79,142,247,0.15);
+    --border: #1e2d48;
+    --text-1: #e8edf5;
+    --text-2: #7a8ba8;
+    --text-3: #3d5070;
+    --tab-h: 70px;
+    --shadow: 0 8px 32px rgba(0,0,0,0.5);
+    /* map */
+    --ocean-fill: #0b1629;
+    --graticule-stroke: #111f35;
+    --sphere-stroke: #1a2f50;
+    --country-stroke: #0b1629;
+    --tooltip-bg: rgba(10,14,26,0.96);
+    --legend-bg: rgba(10,14,26,0.86);
+    /* continent fills */
+    --c-Africa: #7c4a1e;
+    --c-Asia: #7b1f1f;
+    --c-Europe: #2d4a7a;
+    --c-NorthAmerica: #1a5c3a;
+    --c-SouthAmerica: #34603a;
+    --c-Oceania: #1a4a5c;
+    --c-unknown: #1e2d48;
+  }
+
+  /* ── Light theme ── */
+  [data-theme="light"] {
+    --bg-app: #edf2f7;
+    --bg-header: #ffffff;
+    --bg-panel: #f7fafc;
+    --bg-card: #e2eaf4;
+    --bg-row-hover: #d4e2f0;
+    --accent: #2563eb;
+    --accent-dim: rgba(37,99,235,0.1);
+    --border: #c5d5e8;
+    --text-1: #0f172a;
+    --text-2: #475569;
+    --text-3: #94a3b8;
+    --shadow: 0 8px 32px rgba(0,0,0,0.1);
+    /* map */
+    --ocean-fill: #b8d4ea;
+    --graticule-stroke: #96b8d4;
+    --sphere-stroke: #78a8cc;
+    --country-stroke: #c8dff0;
+    --tooltip-bg: rgba(255,255,255,0.97);
+    --legend-bg: rgba(255,255,255,0.92);
+    /* continent fills */
+    --c-Africa: #c87830;
+    --c-Asia: #c43838;
+    --c-Europe: #3a72c4;
+    --c-NorthAmerica: #2a9c58;
+    --c-SouthAmerica: #4aaa58;
+    --c-Oceania: #2a8cb0;
+    --c-unknown: #8aaccb;
+  }
+
+  /* smooth theme transitions */
+  html { transition: background-color 0.25s, color 0.25s; }
+  *, *::before, *::after { transition: background-color 0.25s, border-color 0.25s, color 0.25s; }
+
+  html, body { height: 100%; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg-app); color: var(--text-1); }
+
+  /* ── Header ── */
+  header {
+    height: var(--tab-h);
+    background: var(--bg-header);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 24px;
+    gap: 24px;
+    flex-shrink: 0;
+    position: relative;
+    -webkit-app-region: drag;
+  }
+
+  .app-title {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 5px;
+    flex-shrink: 0;
+  }
+  .title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-1);
+    letter-spacing: 0.03em;
+  }
+  .title-row svg { width: 18px; height: 18px; color: var(--accent); flex-shrink: 0; }
+
+  .theme-toggle {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 9px;
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    background: var(--bg-card);
+    color: var(--text-2);
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    -webkit-app-region: no-drag;
+    letter-spacing: 0.02em;
+  }
+  .theme-toggle svg { width: 11px; height: 11px; flex-shrink: 0; }
+  .theme-toggle:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-dim); }
+  /* icon visibility driven purely by data-theme — no JS needed */
+  .icon-sun  { display: flex; }
+  .icon-moon { display: none; }
+  [data-theme="light"] .icon-sun  { display: none; }
+  [data-theme="light"] .icon-moon { display: flex; }
+
+  .tabs {
+    display: flex;
+    gap: 4px;
+    -webkit-app-region: no-drag;
+    background: var(--bg-app);
+    padding: 5px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .tab-btn {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 7px 22px;
+    border: none;
+    border-radius: 7px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.18s, color 0.18s;
+    background: transparent;
+    color: var(--text-2);
+    letter-spacing: 0.02em;
+    -webkit-app-region: no-drag;
+  }
+  .tab-btn svg { width: 15px; height: 15px; }
+  .tab-btn.active { background: var(--accent); color: #fff; box-shadow: 0 2px 12px rgba(79,142,247,0.35); }
+  .tab-btn:not(.active):hover { background: var(--bg-card); color: var(--text-1); }
+
+  /* ── Layout ── */
+  .content { height: calc(100vh - var(--tab-h)); overflow: hidden; }
+  .view { display: none; height: 100%; }
+  .view.active { display: flex; flex-direction: column; }
+
+  /* ── Map View ── */
+  #map-view { background: var(--bg-app); position: relative; }
+
+  #map-wrap {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+  }
+
+  #world-svg {
+    width: 100%;
+    height: 100%;
+    cursor: grab;
+  }
+  #world-svg:active { cursor: grabbing; }
+
+  .ocean { fill: var(--ocean-fill); }
+  .graticule { fill: none; stroke: var(--graticule-stroke); stroke-width: 0.4; }
+  .sphere-outline { fill: none; stroke: var(--sphere-stroke); stroke-width: 1; }
+  .country-borders { fill: none; stroke: var(--country-stroke); stroke-width: 0.5; }
+
+  .country {
+    stroke: var(--country-stroke);
+    stroke-width: 0.4;
+    transition: filter 0.12s;
+    cursor: pointer;
+  }
+  .country:hover { filter: brightness(1.45) drop-shadow(0 0 4px rgba(0,0,0,0.25)); stroke-width: 0.8; }
+
+  /* Continent colours (from CSS variables — swap with theme) */
+  .c-Africa        { fill: var(--c-Africa); }
+  .c-Asia          { fill: var(--c-Asia); }
+  .c-Europe        { fill: var(--c-Europe); }
+  .c-NorthAmerica  { fill: var(--c-NorthAmerica); }
+  .c-SouthAmerica  { fill: var(--c-SouthAmerica); }
+  .c-Oceania       { fill: var(--c-Oceania); }
+  .c-unknown       { fill: var(--c-unknown); }
+
+  /* ── Tooltip ── */
+  #tooltip {
+    position: fixed;
+    pointer-events: none;
+    background: var(--tooltip-bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 8px 12px;
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(12px);
+    z-index: 100;
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity 0.15s, transform 0.15s;
+    max-width: 280px;
+  }
+  #tooltip.visible { opacity: 1; transform: translateY(0); }
+
+  .tt-flag { font-size: 36px; line-height: 1; margin-bottom: 6px; display: block; }
+  .tt-name { font-size: 16px; font-weight: 700; color: var(--text-1); margin-bottom: 3px; }
+  .tt-capital { font-size: 14px; color: var(--text-2); display: flex; align-items: center; gap: 5px; }
+  .tt-capital svg { width: 11px; height: 11px; flex-shrink: 0; }
+
+  /* ── Zoom Controls ── */
+  .zoom-controls {
+    position: absolute;
+    bottom: 24px;
+    right: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    z-index: 10;
+  }
+  .zoom-btn {
+    width: 34px; height: 34px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text-1);
+    font-size: 18px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .zoom-btn:hover { background: var(--bg-row-hover); border-color: var(--accent); color: var(--accent); }
+
+  /* Legend */
+  .map-legend {
+    position: absolute;
+    bottom: 24px;
+    left: 24px;
+    background: var(--legend-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    backdrop-filter: blur(8px);
+    z-index: 10;
+  }
+  .legend-title { font-size: 10px; font-weight: 700; color: var(--text-2); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 8px; }
+  .legend-item { display: flex; align-items: center; gap: 7px; margin-bottom: 5px; font-size: 11px; color: var(--text-2); }
+  .legend-item:last-child { margin-bottom: 0; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+  /* ── List View ── */
+  #list-view { background: var(--bg-panel); }
+
+  .list-search-bar {
+    padding: 14px 24px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-header);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+  .search-wrap {
+    position: relative;
+    flex: 1;
+    max-width: 380px;
+  }
+  .search-wrap svg { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; color: var(--text-3); pointer-events: none; }
+  #search-input {
+    width: 100%;
+    padding: 8px 12px 8px 34px;
+    background: var(--bg-app);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text-1);
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  #search-input:focus { border-color: var(--accent); }
+  #search-input::placeholder { color: var(--text-3); }
+
+  .collapse-expand-buttons {
+    display: flex;
+    gap: 6px;
+    margin-left: auto;
+  }
+  .pill-btn {
+    padding: 5px 12px;
+    background: var(--bg-app);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-2);
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .pill-btn:hover {
+    background: var(--accent-dim);
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+  .country-count { font-size: 12px; color: var(--text-2); margin-left: 12px; }
+
+  .list-scroll { flex: 1; overflow-y: auto; padding: 0 24px 24px; }
+  .list-scroll::-webkit-scrollbar { width: 5px; }
+  .list-scroll::-webkit-scrollbar-track { background: transparent; }
+  .list-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  .continent-section { margin-top: 28px; }
+  .continent-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+    position: sticky;
+    top: 0;
+    background: var(--bg-panel);
+    padding: 8px 0 8px;
+    z-index: 5;
+    cursor: pointer;
+    user-select: none;
+  }
+  .continent-header:hover .continent-name { color: var(--text-1); }
+  .continent-section.collapsed .continent-header { margin-bottom: 0; }
+  .continent-section.collapsed table { display: none; }
+
+  .continent-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .continent-name { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-2); transition: color 0.12s; }
+  .continent-count { font-size: 11px; color: var(--text-3); background: var(--bg-card); border-radius: 20px; padding: 1px 8px; }
+  .continent-arrow { margin-left: auto; color: var(--text-3); display: flex; align-items: center; transition: transform 0.2s ease; }
+  .continent-section:not(.collapsed) .continent-arrow { transform: rotate(180deg); }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    table-layout: fixed;
+  }
+  thead th {
+    padding: 7px 12px;
+    text-align: left;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    border-bottom: 1px solid var(--border);
+  }
+  thead th:nth-child(1) { width: 52px; text-align: center; }
+  thead th:nth-child(2) { width: 45%; }
+  thead th:nth-child(3) { width: 55%; }
+
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background 0.12s;
+  }
+  tbody tr:hover { background: var(--bg-row-hover); }
+  tbody tr.hidden-row { display: none; }
+
+  td { padding: 9px 12px; vertical-align: middle; }
+  td:first-child { text-align: center; font-size: 22px; padding: 9px 0; }
+
+  .cell-with-mic {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .cell-text { color: var(--text-1); }
+  .cell-text.capital { color: var(--text-2); }
+
+  .mic-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px; height: 26px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--text-3);
+    cursor: pointer;
+    flex-shrink: 0;
+    opacity: 0;
+    transition: background 0.12s, color 0.12s, opacity 0.12s;
+  }
+  tbody tr:hover .mic-btn { opacity: 1; }
+  .mic-btn svg { width: 13px; height: 13px; }
+  .mic-btn:hover { background: var(--accent-dim); color: var(--accent); }
+  .mic-btn.speaking {
+    opacity: 1;
+    color: var(--accent);
+    background: var(--accent-dim);
+    animation: mic-pulse 0.8s ease-in-out infinite alternate;
+  }
+  @keyframes mic-pulse {
+    from { box-shadow: 0 0 0 0 rgba(79,142,247,0.4); }
+    to   { box-shadow: 0 0 0 5px rgba(79,142,247,0); }
+  }
+
+  /* no-results */
+  .no-results { padding: 60px 0; text-align: center; color: var(--text-3); font-size: 14px; display: none; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="app-title">
+    <div class="title-row">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/>
+        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+      </svg>
+      World Map
+    </div>
+    <button class="theme-toggle" onclick="toggleTheme()" id="theme-toggle" title="Toggle light / dark mode">
+      <!-- Sun — visible in dark mode, click → light -->
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="4"/>
+        <line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/>
+        <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/>
+        <line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/>
+        <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/>
+      </svg>
+      <span class="icon-sun">Light</span>
+      <!-- Moon — visible in light mode, click → dark -->
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+      </svg>
+      <span class="icon-moon">Dark</span>
+    </button>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" id="tab-map" onclick="switchTab('map')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/>
+        <line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/>
+      </svg>
+      World Map
+    </button>
+    <button class="tab-btn" id="tab-list" onclick="switchTab('list')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/>
+        <line x1="8" y1="18" x2="21" y2="18"/>
+        <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
+      </svg>
+      Country List
+    </button>
+  </div>
+</header>
+
+<div class="content">
+  <!-- MAP VIEW -->
+  <div class="view active" id="map-view">
+    <div id="map-wrap">
+      <svg id="world-svg"></svg>
+
+      <div id="tooltip">
+        <span class="tt-flag" id="tt-flag"></span>
+        <div class="tt-name" id="tt-name"></div>
+        <div class="tt-capital">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+            <polyline points="9 22 9 12 15 12 15 22"/>
+          </svg>
+          <span id="tt-capital"></span>
+        </div>
+      </div>
+
+      <div class="zoom-controls">
+        <button class="zoom-btn" onclick="zoomIn()" title="Zoom in">+</button>
+        <button class="zoom-btn" onclick="zoomReset()" title="Reset" style="font-size:12px;">⌂</button>
+        <button class="zoom-btn" onclick="zoomOut()" title="Zoom out">−</button>
+      </div>
+
+      <div class="map-legend">
+        <div class="legend-title">Continents</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--c-Africa)"></div>Africa</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--c-Asia)"></div>Asia</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--c-Europe)"></div>Europe</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--c-NorthAmerica)"></div>North America</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--c-SouthAmerica)"></div>South America</div>
+        <div class="legend-item"><div class="legend-dot" style="background:var(--c-Oceania)"></div>Oceania</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LIST VIEW -->
+  <div class="view" id="list-view">
+    <div class="list-search-bar">
+      <div class="search-wrap">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input type="text" id="search-input" placeholder="Search countries or capitals…" oninput="filterList()">
+      </div>
+      <div class="collapse-expand-buttons">
+        <button class="pill-btn" onclick="collapseAll()" title="Collapse all continents">Collapse All</button>
+        <button class="pill-btn" onclick="expandAll()" title="Expand all continents">Expand All</button>
+      </div>
+      <span class="country-count" id="country-count"></span>
+    </div>
+    <div class="list-scroll" id="list-scroll">
+      <div class="no-results" id="no-results">No countries match your search.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── Country Data ───────────────────────────────────────────────────────────
+const COUNTRIES = [
+  // Africa
+  {id:12,  iso2:'DZ', name:'Algeria',                      capital:'Algiers',                  continent:'Africa'},
+  {id:24,  iso2:'AO', name:'Angola',                       capital:'Luanda',                   continent:'Africa'},
+  {id:204, iso2:'BJ', name:'Benin',                        capital:'Porto-Novo',               continent:'Africa'},
+  {id:72,  iso2:'BW', name:'Botswana',                     capital:'Gaborone',                 continent:'Africa'},
+  {id:854, iso2:'BF', name:'Burkina Faso',                 capital:'Ouagadougou',              continent:'Africa'},
+  {id:108, iso2:'BI', name:'Burundi',                      capital:'Gitega',                   continent:'Africa'},
+  {id:132, iso2:'CV', name:'Cape Verde',                   capital:'Praia',                    continent:'Africa'},
+  {id:120, iso2:'CM', name:'Cameroon',                     capital:'Yaoundé',                  continent:'Africa'},
+  {id:140, iso2:'CF', name:'Central African Republic',     capital:'Bangui',                   continent:'Africa'},
+  {id:148, iso2:'TD', name:'Chad',                         capital:"N'Djamena",                continent:'Africa'},
+  {id:174, iso2:'KM', name:'Comoros',                      capital:'Moroni',                   continent:'Africa'},
+  {id:178, iso2:'CG', name:'Republic of the Congo',        capital:'Brazzaville',              continent:'Africa'},
+  {id:180, iso2:'CD', name:'DR Congo',                     capital:'Kinshasa',                 continent:'Africa'},
+  {id:262, iso2:'DJ', name:'Djibouti',                     capital:'Djibouti',                 continent:'Africa'},
+  {id:818, iso2:'EG', name:'Egypt',                        capital:'Cairo',                    continent:'Africa'},
+  {id:226, iso2:'GQ', name:'Equatorial Guinea',            capital:'Malabo',                   continent:'Africa'},
+  {id:232, iso2:'ER', name:'Eritrea',                      capital:'Asmara',                   continent:'Africa'},
+  {id:748, iso2:'SZ', name:'Eswatini',                     capital:'Mbabane',                  continent:'Africa'},
+  {id:231, iso2:'ET', name:'Ethiopia',                     capital:'Addis Ababa',              continent:'Africa'},
+  {id:266, iso2:'GA', name:'Gabon',                        capital:'Libreville',               continent:'Africa'},
+  {id:270, iso2:'GM', name:'Gambia',                       capital:'Banjul',                   continent:'Africa'},
+  {id:288, iso2:'GH', name:'Ghana',                        capital:'Accra',                    continent:'Africa'},
+  {id:324, iso2:'GN', name:'Guinea',                       capital:'Conakry',                  continent:'Africa'},
+  {id:624, iso2:'GW', name:'Guinea-Bissau',                capital:'Bissau',                   continent:'Africa'},
+  {id:384, iso2:'CI', name:"Côte d'Ivoire",                capital:'Yamoussoukro',             continent:'Africa'},
+  {id:404, iso2:'KE', name:'Kenya',                        capital:'Nairobi',                  continent:'Africa'},
+  {id:426, iso2:'LS', name:'Lesotho',                      capital:'Maseru',                   continent:'Africa'},
+  {id:430, iso2:'LR', name:'Liberia',                      capital:'Monrovia',                 continent:'Africa'},
+  {id:434, iso2:'LY', name:'Libya',                        capital:'Tripoli',                  continent:'Africa'},
+  {id:450, iso2:'MG', name:'Madagascar',                   capital:'Antananarivo',             continent:'Africa'},
+  {id:454, iso2:'MW', name:'Malawi',                       capital:'Lilongwe',                 continent:'Africa'},
+  {id:466, iso2:'ML', name:'Mali',                         capital:'Bamako',                   continent:'Africa'},
+  {id:478, iso2:'MR', name:'Mauritania',                   capital:'Nouakchott',               continent:'Africa'},
+  {id:480, iso2:'MU', name:'Mauritius',                    capital:'Port Louis',               continent:'Africa'},
+  {id:504, iso2:'MA', name:'Morocco',                      capital:'Rabat',                    continent:'Africa'},
+  {id:508, iso2:'MZ', name:'Mozambique',                   capital:'Maputo',                   continent:'Africa'},
+  {id:516, iso2:'NA', name:'Namibia',                      capital:'Windhoek',                 continent:'Africa'},
+  {id:562, iso2:'NE', name:'Niger',                        capital:'Niamey',                   continent:'Africa'},
+  {id:566, iso2:'NG', name:'Nigeria',                      capital:'Abuja',                    continent:'Africa'},
+  {id:646, iso2:'RW', name:'Rwanda',                       capital:'Kigali',                   continent:'Africa'},
+  {id:678, iso2:'ST', name:'São Tomé and Príncipe',        capital:'São Tomé',                 continent:'Africa'},
+  {id:686, iso2:'SN', name:'Senegal',                      capital:'Dakar',                    continent:'Africa'},
+  {id:690, iso2:'SC', name:'Seychelles',                   capital:'Victoria',                 continent:'Africa'},
+  {id:694, iso2:'SL', name:'Sierra Leone',                 capital:'Freetown',                 continent:'Africa'},
+  {id:706, iso2:'SO', name:'Somalia',                      capital:'Mogadishu',                continent:'Africa'},
+  {id:710, iso2:'ZA', name:'South Africa',                 capital:'Pretoria',                 continent:'Africa'},
+  {id:728, iso2:'SS', name:'South Sudan',                  capital:'Juba',                     continent:'Africa'},
+  {id:729, iso2:'SD', name:'Sudan',                        capital:'Khartoum',                 continent:'Africa'},
+  {id:834, iso2:'TZ', name:'Tanzania',                     capital:'Dodoma',                   continent:'Africa'},
+  {id:768, iso2:'TG', name:'Togo',                         capital:'Lomé',                     continent:'Africa'},
+  {id:788, iso2:'TN', name:'Tunisia',                      capital:'Tunis',                    continent:'Africa'},
+  {id:800, iso2:'UG', name:'Uganda',                       capital:'Kampala',                  continent:'Africa'},
+  {id:894, iso2:'ZM', name:'Zambia',                       capital:'Lusaka',                   continent:'Africa'},
+  {id:716, iso2:'ZW', name:'Zimbabwe',                     capital:'Harare',                   continent:'Africa'},
+  // North America
+  {id:28,  iso2:'AG', name:'Antigua and Barbuda',          capital:"Saint John's",             continent:'North America'},
+  {id:44,  iso2:'BS', name:'Bahamas',                      capital:'Nassau',                   continent:'North America'},
+  {id:52,  iso2:'BB', name:'Barbados',                     capital:'Bridgetown',               continent:'North America'},
+  {id:84,  iso2:'BZ', name:'Belize',                       capital:'Belmopan',                 continent:'North America'},
+  {id:124, iso2:'CA', name:'Canada',                       capital:'Ottawa',                   continent:'North America'},
+  {id:188, iso2:'CR', name:'Costa Rica',                   capital:'San José',                 continent:'North America'},
+  {id:192, iso2:'CU', name:'Cuba',                         capital:'Havana',                   continent:'North America'},
+  {id:212, iso2:'DM', name:'Dominica',                     capital:'Roseau',                   continent:'North America'},
+  {id:214, iso2:'DO', name:'Dominican Republic',           capital:'Santo Domingo',            continent:'North America'},
+  {id:222, iso2:'SV', name:'El Salvador',                  capital:'San Salvador',             continent:'North America'},
+  {id:304, iso2:'GL', name:'Greenland',                     capital:'Nuuk',                     continent:'North America'},
+  {id:308, iso2:'GD', name:'Grenada',                      capital:"Saint George's",           continent:'North America'},
+  {id:320, iso2:'GT', name:'Guatemala',                    capital:'Guatemala City',           continent:'North America'},
+  {id:332, iso2:'HT', name:'Haiti',                        capital:'Port-au-Prince',           continent:'North America'},
+  {id:340, iso2:'HN', name:'Honduras',                     capital:'Tegucigalpa',              continent:'North America'},
+  {id:388, iso2:'JM', name:'Jamaica',                      capital:'Kingston',                 continent:'North America'},
+  {id:484, iso2:'MX', name:'Mexico',                       capital:'Mexico City',              continent:'North America'},
+  {id:558, iso2:'NI', name:'Nicaragua',                    capital:'Managua',                  continent:'North America'},
+  {id:591, iso2:'PA', name:'Panama',                       capital:'Panama City',              continent:'North America'},
+  {id:659, iso2:'KN', name:'Saint Kitts and Nevis',        capital:'Basseterre',               continent:'North America'},
+  {id:662, iso2:'LC', name:'Saint Lucia',                  capital:'Castries',                 continent:'North America'},
+  {id:670, iso2:'VC', name:'Saint Vincent and the Grenadines', capital:'Kingstown',           continent:'North America'},
+  {id:780, iso2:'TT', name:'Trinidad and Tobago',          capital:'Port of Spain',            continent:'North America'},
+  {id:840, iso2:'US', name:'United States',                capital:'Washington D.C.',          continent:'North America'},
+  // South America
+  {id:32,  iso2:'AR', name:'Argentina',                    capital:'Buenos Aires',             continent:'South America'},
+  {id:68,  iso2:'BO', name:'Bolivia',                      capital:'Sucre',                    continent:'South America'},
+  {id:76,  iso2:'BR', name:'Brazil',                       capital:'Brasília',                 continent:'South America'},
+  {id:152, iso2:'CL', name:'Chile',                        capital:'Santiago',                 continent:'South America'},
+  {id:170, iso2:'CO', name:'Colombia',                     capital:'Bogotá',                   continent:'South America'},
+  {id:218, iso2:'EC', name:'Ecuador',                      capital:'Quito',                    continent:'South America'},
+  {id:328, iso2:'GY', name:'Guyana',                       capital:'Georgetown',               continent:'South America'},
+  {id:600, iso2:'PY', name:'Paraguay',                     capital:'Asunción',                 continent:'South America'},
+  {id:604, iso2:'PE', name:'Peru',                         capital:'Lima',                     continent:'South America'},
+  {id:740, iso2:'SR', name:'Suriname',                     capital:'Paramaribo',               continent:'South America'},
+  {id:238, iso2:'FK', name:'Falkland Islands',              capital:'Stanley',                  continent:'South America'},
+  {id:254, iso2:'GF', name:'French Guiana',                capital:'Cayenne',                  continent:'South America'},
+  {id:858, iso2:'UY', name:'Uruguay',                      capital:'Montevideo',               continent:'South America'},
+  {id:862, iso2:'VE', name:'Venezuela',                    capital:'Caracas',                  continent:'South America'},
+  // Asia
+  {id:4,   iso2:'AF', name:'Afghanistan',                  capital:'Kabul',                    continent:'Asia'},
+  {id:51,  iso2:'AM', name:'Armenia',                      capital:'Yerevan',                  continent:'Asia'},
+  {id:31,  iso2:'AZ', name:'Azerbaijan',                   capital:'Baku',                     continent:'Asia'},
+  {id:48,  iso2:'BH', name:'Bahrain',                      capital:'Manama',                   continent:'Asia'},
+  {id:50,  iso2:'BD', name:'Bangladesh',                   capital:'Dhaka',                    continent:'Asia'},
+  {id:64,  iso2:'BT', name:'Bhutan',                       capital:'Thimphu',                  continent:'Asia'},
+  {id:96,  iso2:'BN', name:'Brunei',                       capital:'Bandar Seri Begawan',      continent:'Asia'},
+  {id:116, iso2:'KH', name:'Cambodia',                     capital:'Phnom Penh',               continent:'Asia'},
+  {id:156, iso2:'CN', name:'China',                        capital:'Beijing',                  continent:'Asia'},
+  {id:196, iso2:'CY', name:'Cyprus',                       capital:'Nicosia',                  continent:'Asia'},
+  {id:268, iso2:'GE', name:'Georgia',                      capital:'Tbilisi',                  continent:'Asia'},
+  {id:356, iso2:'IN', name:'India',                        capital:'New Delhi',                continent:'Asia'},
+  {id:360, iso2:'ID', name:'Indonesia',                    capital:'Jakarta',                  continent:'Asia'},
+  {id:364, iso2:'IR', name:'Iran',                         capital:'Tehran',                   continent:'Asia'},
+  {id:368, iso2:'IQ', name:'Iraq',                         capital:'Baghdad',                  continent:'Asia'},
+  {id:376, iso2:'IL', name:'Israel',                       capital:'Jerusalem',                continent:'Asia'},
+  {id:392, iso2:'JP', name:'Japan',                        capital:'Tokyo',                    continent:'Asia'},
+  {id:400, iso2:'JO', name:'Jordan',                       capital:'Amman',                    continent:'Asia'},
+  {id:398, iso2:'KZ', name:'Kazakhstan',                   capital:'Astana',                   continent:'Asia'},
+  {id:414, iso2:'KW', name:'Kuwait',                       capital:'Kuwait City',              continent:'Asia'},
+  {id:417, iso2:'KG', name:'Kyrgyzstan',                   capital:'Bishkek',                  continent:'Asia'},
+  {id:418, iso2:'LA', name:'Laos',                         capital:'Vientiane',                continent:'Asia'},
+  {id:422, iso2:'LB', name:'Lebanon',                      capital:'Beirut',                   continent:'Asia'},
+  {id:458, iso2:'MY', name:'Malaysia',                     capital:'Kuala Lumpur',             continent:'Asia'},
+  {id:462, iso2:'MV', name:'Maldives',                     capital:'Malé',                     continent:'Asia'},
+  {id:496, iso2:'MN', name:'Mongolia',                     capital:'Ulaanbaatar',              continent:'Asia'},
+  {id:104, iso2:'MM', name:'Myanmar',                      capital:'Naypyidaw',                continent:'Asia'},
+  {id:524, iso2:'NP', name:'Nepal',                        capital:'Kathmandu',                continent:'Asia'},
+  {id:408, iso2:'KP', name:'North Korea',                  capital:'Pyongyang',                continent:'Asia'},
+  {id:512, iso2:'OM', name:'Oman',                         capital:'Muscat',                   continent:'Asia'},
+  {id:586, iso2:'PK', name:'Pakistan',                     capital:'Islamabad',                continent:'Asia'},
+  {id:275, iso2:'PS', name:'Palestine',                    capital:'Ramallah',                 continent:'Asia'},
+  {id:608, iso2:'PH', name:'Philippines',                  capital:'Manila',                   continent:'Asia'},
+  {id:634, iso2:'QA', name:'Qatar',                        capital:'Doha',                     continent:'Asia'},
+  {id:682, iso2:'SA', name:'Saudi Arabia',                 capital:'Riyadh',                   continent:'Asia'},
+  {id:702, iso2:'SG', name:'Singapore',                    capital:'Singapore',                continent:'Asia'},
+  {id:410, iso2:'KR', name:'South Korea',                  capital:'Seoul',                    continent:'Asia'},
+  {id:144, iso2:'LK', name:'Sri Lanka',                    capital:'Sri Jayawardenepura Kotte',continent:'Asia'},
+  {id:760, iso2:'SY', name:'Syria',                        capital:'Damascus',                 continent:'Asia'},
+  {id:158, iso2:'TW', name:'Taiwan',                       capital:'Taipei',                   continent:'Asia'},
+  {id:762, iso2:'TJ', name:'Tajikistan',                   capital:'Dushanbe',                 continent:'Asia'},
+  {id:764, iso2:'TH', name:'Thailand',                     capital:'Bangkok',                  continent:'Asia'},
+  {id:626, iso2:'TL', name:'Timor-Leste',                  capital:'Dili',                     continent:'Asia'},
+  {id:792, iso2:'TR', name:'Turkey',                       capital:'Ankara',                   continent:'Asia'},
+  {id:795, iso2:'TM', name:'Turkmenistan',                 capital:'Ashgabat',                 continent:'Asia'},
+  {id:784, iso2:'AE', name:'United Arab Emirates',         capital:'Abu Dhabi',                continent:'Asia'},
+  {id:860, iso2:'UZ', name:'Uzbekistan',                   capital:'Tashkent',                 continent:'Asia'},
+  {id:704, iso2:'VN', name:'Vietnam',                      capital:'Hanoi',                    continent:'Asia'},
+  {id:887, iso2:'YE', name:'Yemen',                        capital:'Sanaa',                    continent:'Asia'},
+  // Europe
+  {id:8,   iso2:'AL', name:'Albania',                      capital:'Tirana',                   continent:'Europe'},
+  {id:20,  iso2:'AD', name:'Andorra',                      capital:'Andorra la Vella',         continent:'Europe'},
+  {id:40,  iso2:'AT', name:'Austria',                      capital:'Vienna',                   continent:'Europe'},
+  {id:112, iso2:'BY', name:'Belarus',                      capital:'Minsk',                    continent:'Europe'},
+  {id:56,  iso2:'BE', name:'Belgium',                      capital:'Brussels',                 continent:'Europe'},
+  {id:70,  iso2:'BA', name:'Bosnia and Herzegovina',       capital:'Sarajevo',                 continent:'Europe'},
+  {id:100, iso2:'BG', name:'Bulgaria',                     capital:'Sofia',                    continent:'Europe'},
+  {id:191, iso2:'HR', name:'Croatia',                      capital:'Zagreb',                   continent:'Europe'},
+  {id:203, iso2:'CZ', name:'Czech Republic',               capital:'Prague',                   continent:'Europe'},
+  {id:208, iso2:'DK', name:'Denmark',                      capital:'Copenhagen',               continent:'Europe'},
+  {id:233, iso2:'EE', name:'Estonia',                      capital:'Tallinn',                  continent:'Europe'},
+  {id:246, iso2:'FI', name:'Finland',                      capital:'Helsinki',                 continent:'Europe'},
+  {id:250, iso2:'FR', name:'France',                       capital:'Paris',                    continent:'Europe'},
+  {id:276, iso2:'DE', name:'Germany',                      capital:'Berlin',                   continent:'Europe'},
+  {id:300, iso2:'GR', name:'Greece',                       capital:'Athens',                   continent:'Europe'},
+  {id:348, iso2:'HU', name:'Hungary',                      capital:'Budapest',                 continent:'Europe'},
+  {id:352, iso2:'IS', name:'Iceland',                      capital:'Reykjavik',                continent:'Europe'},
+  {id:372, iso2:'IE', name:'Ireland',                      capital:'Dublin',                   continent:'Europe'},
+  {id:380, iso2:'IT', name:'Italy',                        capital:'Rome',                     continent:'Europe'},
+  {id:428, iso2:'LV', name:'Latvia',                       capital:'Riga',                     continent:'Europe'},
+  {id:438, iso2:'LI', name:'Liechtenstein',                capital:'Vaduz',                    continent:'Europe'},
+  {id:440, iso2:'LT', name:'Lithuania',                    capital:'Vilnius',                  continent:'Europe'},
+  {id:442, iso2:'LU', name:'Luxembourg',                   capital:'Luxembourg City',          continent:'Europe'},
+  {id:470, iso2:'MT', name:'Malta',                        capital:'Valletta',                 continent:'Europe'},
+  {id:498, iso2:'MD', name:'Moldova',                      capital:'Chișinău',                 continent:'Europe'},
+  {id:492, iso2:'MC', name:'Monaco',                       capital:'Monaco',                   continent:'Europe'},
+  {id:499, iso2:'ME', name:'Montenegro',                   capital:'Podgorica',                continent:'Europe'},
+  {id:528, iso2:'NL', name:'Netherlands',                  capital:'Amsterdam',                continent:'Europe'},
+  {id:807, iso2:'MK', name:'North Macedonia',              capital:'Skopje',                   continent:'Europe'},
+  {id:578, iso2:'NO', name:'Norway',                       capital:'Oslo',                     continent:'Europe'},
+  {id:616, iso2:'PL', name:'Poland',                       capital:'Warsaw',                   continent:'Europe'},
+  {id:620, iso2:'PT', name:'Portugal',                     capital:'Lisbon',                   continent:'Europe'},
+  {id:642, iso2:'RO', name:'Romania',                      capital:'Bucharest',                continent:'Europe'},
+  {id:643, iso2:'RU', name:'Russia',                       capital:'Moscow',                   continent:'Europe'},
+  {id:674, iso2:'SM', name:'San Marino',                   capital:'San Marino',               continent:'Europe'},
+  {id:688, iso2:'RS', name:'Serbia',                       capital:'Belgrade',                 continent:'Europe'},
+  {id:703, iso2:'SK', name:'Slovakia',                     capital:'Bratislava',               continent:'Europe'},
+  {id:705, iso2:'SI', name:'Slovenia',                     capital:'Ljubljana',                continent:'Europe'},
+  {id:724, iso2:'ES', name:'Spain',                        capital:'Madrid',                   continent:'Europe'},
+  {id:752, iso2:'SE', name:'Sweden',                       capital:'Stockholm',                continent:'Europe'},
+  {id:756, iso2:'CH', name:'Switzerland',                  capital:'Bern',                     continent:'Europe'},
+  {id:804, iso2:'UA', name:'Ukraine',                      capital:'Kyiv',                     continent:'Europe'},
+  {id:826, iso2:'GB', name:'United Kingdom',               capital:'London',                   continent:'Europe'},
+  {id:336, iso2:'VA', name:'Vatican City',                 capital:'Vatican City',             continent:'Europe'},
+  // Oceania
+  {id:36,  iso2:'AU', name:'Australia',                    capital:'Canberra',                 continent:'Oceania'},
+  {id:242, iso2:'FJ', name:'Fiji',                         capital:'Suva',                     continent:'Oceania'},
+  {id:296, iso2:'KI', name:'Kiribati',                     capital:'South Tarawa',             continent:'Oceania'},
+  {id:584, iso2:'MH', name:'Marshall Islands',             capital:'Majuro',                   continent:'Oceania'},
+  {id:583, iso2:'FM', name:'Micronesia',                   capital:'Palikir',                  continent:'Oceania'},
+  {id:520, iso2:'NR', name:'Nauru',                        capital:'Yaren',                    continent:'Oceania'},
+  {id:554, iso2:'NZ', name:'New Zealand',                  capital:'Wellington',               continent:'Oceania'},
+  {id:585, iso2:'PW', name:'Palau',                        capital:'Ngerulmud',                continent:'Oceania'},
+  {id:598, iso2:'PG', name:'Papua New Guinea',             capital:'Port Moresby',             continent:'Oceania'},
+  {id:882, iso2:'WS', name:'Samoa',                        capital:'Apia',                     continent:'Oceania'},
+  {id:90,  iso2:'SB', name:'Solomon Islands',              capital:'Honiara',                  continent:'Oceania'},
+  {id:776, iso2:'TO', name:'Tonga',                        capital:"Nuku'alofa",               continent:'Oceania'},
+  {id:798, iso2:'TV', name:'Tuvalu',                       capital:'Funafuti',                 continent:'Oceania'},
+  {id:548, iso2:'VU', name:'Vanuatu',                      capital:'Port Vila',                continent:'Oceania'},
+];
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+function flagEmoji(iso2) {
+  return [...iso2.toUpperCase()].map(c => String.fromCodePoint(0x1F1E6 - 65 + c.charCodeAt(0))).join('');
+}
+
+const CONTINENT_CLASS = {
+  'Africa':        'c-Africa',
+  'Asia':          'c-Asia',
+  'Europe':        'c-Europe',
+  'North America': 'c-NorthAmerica',
+  'South America': 'c-SouthAmerica',
+  'Oceania':       'c-Oceania',
+};
+const CONTINENT_COLOR = {
+  'Africa':        '#c4742a',
+  'Asia':          '#c43a3a',
+  'Europe':        '#3a6ab0',
+  'North America': '#2a8c5a',
+  'South America': '#4a9055',
+  'Oceania':       '#2a7090',
+};
+
+const countryById = new Map(COUNTRIES.map(c => [c.id, c]));
+
+// ─── Tab switching ───────────────────────────────────────────────────────────
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  document.getElementById(tab + '-view').classList.add('active');
+}
+
+// ─── Tooltip ─────────────────────────────────────────────────────────────────
+const tooltip = document.getElementById('tooltip');
+let tooltipTimer;
+
+function showTooltip(event, country) {
+  clearTimeout(tooltipTimer);
+  document.getElementById('tt-flag').textContent    = flagEmoji(country.iso2);
+  document.getElementById('tt-name').textContent    = country.name;
+  document.getElementById('tt-capital').textContent = country.capital;
+  moveTooltip(event);
+  tooltip.classList.add('visible');
+}
+
+function moveTooltip(event) {
+  const pad = 16, w = 220, h = 110;
+  let x = event.clientX + pad;
+  let y = event.clientY + pad;
+  if (x + w > window.innerWidth)  x = event.clientX - w - pad;
+  if (y + h > window.innerHeight) y = event.clientY - h - pad;
+  tooltip.style.left = x + 'px';
+  tooltip.style.top  = y + 'px';
+}
+
+function hideTooltip() {
+  tooltipTimer = setTimeout(() => tooltip.classList.remove('visible'), 80);
+}
+
+// ─── Map ─────────────────────────────────────────────────────────────────────
+let zoomBehavior, svgSel;
+
+async function initMap() {
+  // Always wipe before drawing so multiple calls never stack layers.
+  document.getElementById('world-svg').innerHTML = '';
+
+  const wrap = document.getElementById('map-wrap');
+  const W = wrap.clientWidth;
+  const H = wrap.clientHeight;
+
+  svgSel = d3.select('#world-svg');
+  svgSel.attr('viewBox', `0 0 ${W} ${H}`).attr('preserveAspectRatio', 'xMidYMid meet');
+
+  const projection = d3.geoNaturalEarth1()
+    .scale(Math.min(W / 6.3, H / 3.2))
+    .translate([W / 2, H / 2]);
+
+  const pathGen = d3.geoPath().projection(projection);
+
+  // Ocean background — fixed layer, always fills the full SVG
+  svgSel.append('rect').attr('class', 'ocean').attr('width', W).attr('height', H);
+
+  // Single group that receives the zoom transform — everything zoomable goes inside
+  const g = svgSel.append('g').attr('class', 'map-g');
+
+  // Graticule inside g so it moves with countries on zoom/pan
+  const graticule = d3.geoGraticule()();
+  g.append('path').datum(graticule).attr('class', 'graticule').attr('d', pathGen);
+
+  // Load topojson
+  let world;
+  try {
+    world = await fetch('./vendor/countries-110m.json').then(r => r.json());
+  } catch(e) {
+    console.error('Failed to load map data', e);
+    return;
+  }
+
+  const countries = topojson.feature(world, world.objects.countries);
+  const borders   = topojson.mesh(world, world.objects.countries, (a, b) => a !== b);
+
+  // Draw countries
+  g.selectAll('.country')
+    .data(countries.features)
+    .join('path')
+    .attr('class', d => {
+      const c = countryById.get(+d.id);
+      return 'country ' + (c ? (CONTINENT_CLASS[c.continent] || 'c-unknown') : 'c-unknown');
+    })
+    .attr('d', pathGen)
+    .on('mouseover', (event, d) => {
+      const c = countryById.get(+d.id);
+      if (c) showTooltip(event, c);
+    })
+    .on('mousemove', (event) => moveTooltip(event))
+    .on('mouseout',  () => hideTooltip());
+
+  // French Guiana — not a separate feature in topojson (merged into France).
+  // Drawn as a custom GeoJSON polygon on top of France so it gets South America colouring.
+  const frenchGuianaGeo = {
+    type: 'Feature', id: '254',
+    geometry: { type: 'Polygon', coordinates: [[
+      [-54.01, 5.72], [-53.50, 5.87], [-53.00, 5.76], [-52.60, 5.67],
+      [-52.30, 5.56], [-52.00, 5.30], [-51.95, 5.10], [-51.85, 4.55],
+      [-51.66, 4.05], [-51.66, 3.30], [-51.80, 2.50], [-52.05, 2.35],
+      [-52.50, 2.18], [-53.00, 2.30], [-53.50, 2.35], [-54.00, 2.22],
+      [-54.35, 2.45], [-54.60, 3.10], [-54.50, 4.20], [-54.25, 5.10],
+      [-54.01, 5.72]
+    ]] }
+  };
+  g.append('path')
+    .datum(frenchGuianaGeo)
+    .attr('class', 'country c-SouthAmerica')
+    .attr('d', pathGen)
+    .on('mouseover', (event) => { const c = countryById.get(254); if (c) showTooltip(event, c); })
+    .on('mousemove', (event) => moveTooltip(event))
+    .on('mouseout',  () => hideTooltip());
+
+  // Draw borders
+  g.append('path')
+    .datum(borders)
+    .attr('class', 'country-borders')
+    .attr('d', pathGen);
+
+  // Sphere outline
+  g.append('path')
+    .datum({type:'Sphere'})
+    .attr('class', 'sphere-outline')
+    .attr('d', pathGen);
+
+  // Zoom & pan
+  zoomBehavior = d3.zoom()
+    .scaleExtent([1, 12])
+    .translateExtent([[0, 0], [W, H]])
+    .on('zoom', (event) => {
+      g.attr('transform', event.transform);
+    });
+
+  svgSel.call(zoomBehavior);
+}
+
+function zoomIn()    { svgSel && svgSel.transition().duration(300).call(zoomBehavior.scaleBy, 1.5); }
+function zoomOut()   { svgSel && svgSel.transition().duration(300).call(zoomBehavior.scaleBy, 1/1.5); }
+function zoomReset() { svgSel && svgSel.transition().duration(400).call(zoomBehavior.transform, d3.zoomIdentity); }
+
+// ─── List ─────────────────────────────────────────────────────────────────────
+const MIC_SVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+  <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+  <line x1="12" y1="19" x2="12" y2="23"/>
+  <line x1="8" y1="23" x2="16" y2="23"/>
+</svg>`;
+
+let activeMicBtn = null;
+
+function speak(text, btn) {
+  if (!window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  if (activeMicBtn) { activeMicBtn.classList.remove('speaking'); activeMicBtn = null; }
+
+  const utt = new SpeechSynthesisUtterance(text);
+  utt.lang = 'en-US';
+  utt.rate = 0.9;
+
+  btn.classList.add('speaking');
+  activeMicBtn = btn;
+
+  utt.onend = utt.onerror = () => {
+    btn.classList.remove('speaking');
+    if (activeMicBtn === btn) activeMicBtn = null;
+  };
+  window.speechSynthesis.speak(utt);
+}
+
+const CONTINENT_ORDER = ['Africa','Asia','Europe','North America','Oceania','South America'];
+
+function toggleContinent(header) {
+  header.closest('.continent-section').classList.toggle('collapsed');
+}
+
+function collapseAll() {
+  document.querySelectorAll('.continent-section').forEach(section => {
+    section.classList.add('collapsed');
+  });
+}
+
+function expandAll() {
+  document.querySelectorAll('.continent-section').forEach(section => {
+    section.classList.remove('collapsed');
+  });
+}
+
+function buildList() {
+  const scroll = document.getElementById('list-scroll');
+  const sorted = [...COUNTRIES].sort((a,b) => a.name.localeCompare(b.name));
+
+  let html = '<div class="no-results" id="no-results">No countries match your search.</div>';
+
+  for (const cont of CONTINENT_ORDER) {
+    const group = sorted.filter(c => c.continent === cont);
+    if (!group.length) continue;
+    const color = CONTINENT_COLOR[cont] || '#888';
+    const cssClass = (CONTINENT_CLASS[cont] || 'c-unknown').replace('c-','');
+
+    html += `
+    <div class="continent-section collapsed" data-continent="${cont}">
+      <div class="continent-header" onclick="toggleContinent(this)">
+        <div class="continent-dot" style="background:${color}"></div>
+        <span class="continent-name">${cont}</span>
+        <span class="continent-count">${group.length}</span>
+        <span class="continent-arrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span>
+      </div>
+      <table>
+        <thead><tr><th>Flag</th><th>Country</th><th>Capital</th></tr></thead>
+        <tbody>
+    `;
+
+    for (const c of group) {
+      const flag = flagEmoji(c.iso2);
+      const cid  = `${c.iso2}`;
+      html += `
+        <tr data-name="${c.name.toLowerCase()}" data-capital="${c.capital.toLowerCase()}">
+          <td>${flag}</td>
+          <td>
+            <div class="cell-with-mic">
+              <span class="cell-text">${c.name}</span>
+              <button class="mic-btn" title="Pronounce country name" onclick="speak('${c.name.replace(/'/g,"\\'")}', this)">${MIC_SVG}</button>
+            </div>
+          </td>
+          <td>
+            <div class="cell-with-mic">
+              <span class="cell-text capital">${c.capital}</span>
+              <button class="mic-btn" title="Pronounce capital" onclick="speak('${c.capital.replace(/'/g,"\\'")}', this)">${MIC_SVG}</button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }
+    html += `</tbody></table></div>`;
+  }
+
+  scroll.innerHTML = html;
+  updateCount(COUNTRIES.length);
+}
+
+function filterList() {
+  const q = document.getElementById('search-input').value.trim().toLowerCase();
+  let visible = 0;
+
+  document.querySelectorAll('#list-scroll tbody tr').forEach(row => {
+    const name    = row.dataset.name    || '';
+    const capital = row.dataset.capital || '';
+    const match   = !q || name.includes(q) || capital.includes(q);
+    row.classList.toggle('hidden-row', !match);
+    if (match) visible++;
+  });
+
+  // Show/hide/expand sections based on search
+  document.querySelectorAll('.continent-section').forEach(section => {
+    const hasVisible = [...section.querySelectorAll('tbody tr')].some(r => !r.classList.contains('hidden-row'));
+    section.style.display = hasVisible ? '' : 'none';
+    if (q) {
+      section.classList.toggle('collapsed', !hasVisible);
+    } else {
+      section.classList.add('collapsed');
+    }
+  });
+
+  const noResults = document.getElementById('no-results');
+  noResults.style.display = visible === 0 ? 'block' : 'none';
+  updateCount(visible);
+}
+
+function updateCount(n) {
+  document.getElementById('country-count').textContent = `${n} countr${n === 1 ? 'y' : 'ies'}`;
+}
+
+// ─── Theme ───────────────────────────────────────────────────────────────────
+function toggleTheme() {
+  const html    = document.documentElement;
+  const next    = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  html.setAttribute('data-theme', next);
+  localStorage.setItem('wm-theme', next);
+  // CSS variables propagate to all SVG elements automatically — no redraw needed.
+}
+
+// Restore saved preference
+(function () {
+  const saved = localStorage.getItem('wm-theme');
+  if (saved) document.documentElement.setAttribute('data-theme', saved);
+})();
+
+// ─── Init ────────────────────────────────────────────────────────────────────
+buildList();
+initMap();
+
+let resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(initMap, 150);
+});
+</script>
+</body>
+</html>
