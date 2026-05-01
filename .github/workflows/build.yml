@@ -40,13 +40,13 @@ jobs:
 
       - name: Build Electron app (macOS)
         if: matrix.platform == 'darwin'
-        run: npm run dist:mac
+        run: npx electron-builder --mac --publish never
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
       - name: Build Electron app (Windows)
         if: matrix.platform == 'win32'
-        run: npm run dist:win
+        run: npx electron-builder --win --publish never
 
       - name: List build artifacts
         run: ls -lah dist/
