@@ -188,6 +188,7 @@
   #world-svg:active { cursor: grabbing; }
 
   .ocean { fill: var(--ocean-fill); }
+  .ocean-sphere { fill: var(--ocean-fill); }
   .graticule { fill: none; stroke: var(--graticule-stroke); stroke-width: 0.4; }
   .sphere-outline { fill: none; stroke: var(--sphere-stroke); stroke-width: 1; }
   .country-borders { fill: none; stroke: var(--country-stroke); stroke-width: 0.5; }
@@ -231,6 +232,34 @@
   .tt-name { font-size: 16px; font-weight: 700; color: var(--text-1); margin-bottom: 3px; }
   .tt-capital { font-size: 14px; color: var(--text-2); display: flex; align-items: center; gap: 5px; }
   .tt-capital svg { width: 11px; height: 11px; flex-shrink: 0; }
+
+  /* ── 2D/3D Mode Toggle ── */
+  .mode-toggle {
+    position: absolute;
+    top: 18px;
+    right: 24px;
+    display: flex;
+    gap: 2px;
+    padding: 3px;
+    background: var(--legend-bg);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    backdrop-filter: blur(8px);
+    z-index: 10;
+  }
+  .mode-btn {
+    border: none;
+    background: transparent;
+    color: var(--text-2);
+    font-size: 12px;
+    font-weight: 600;
+    padding: 5px 14px;
+    border-radius: 16px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .mode-btn.active { background: var(--accent); color: #fff; }
+  .mode-btn:not(.active):hover { color: var(--text-1); }
 
   /* ── Zoom Controls ── */
   .zoom-controls {
@@ -493,6 +522,11 @@
           </svg>
           <span id="tt-capital"></span>
         </div>
+      </div>
+
+      <div class="mode-toggle">
+        <button id="mode-2d" class="mode-btn" onclick="setMapMode('2d')" title="Flat map">🗺️ 2D</button>
+        <button id="mode-3d" class="mode-btn" onclick="setMapMode('3d')" title="3D globe — drag to rotate">🌐 3D</button>
       </div>
 
       <div class="zoom-controls">
@@ -805,6 +839,20 @@ function hideTooltip() {
 
 // ─── Map ─────────────────────────────────────────────────────────────────────
 let zoomBehavior, svgSel;
+let mapMode = localStorage.getItem('wm-map-mode') || '2d';
+
+function setMapMode(mode) {
+  if (mode === mapMode) return;
+  mapMode = mode;
+  localStorage.setItem('wm-map-mode', mode);
+  syncModeButtons();
+  initMap();
+}
+
+function syncModeButtons() {
+  document.getElementById('mode-2d').classList.toggle('active', mapMode === '2d');
+  document.getElementById('mode-3d').classList.toggle('active', mapMode === '3d');
+}
 
 async function initMap() {
   // Always wipe before drawing so multiple calls never stack layers.
@@ -817,19 +865,29 @@ async function initMap() {
   svgSel = d3.select('#world-svg');
   svgSel.attr('viewBox', `0 0 ${W} ${H}`).attr('preserveAspectRatio', 'xMidYMid meet');
 
-  const projection = d3.geoNaturalEarth1()
-    .scale(Math.min(W / 6.3, H / 3.2))
+  const is3D = mapMode === '3d';
+  const baseScale = is3D ? Math.min(W, H) / 2.3 : Math.min(W / 6.3, H / 3.2);
+
+  const projection = (is3D
+    ? d3.geoOrthographic().clipAngle(90).rotate([0, -15])
+    : d3.geoNaturalEarth1())
+    .scale(baseScale)
     .translate([W / 2, H / 2]);
 
   const pathGen = d3.geoPath().projection(projection);
 
-  // Ocean background — fixed layer, always fills the full SVG
-  svgSel.append('rect').attr('class', 'ocean').attr('width', W).attr('height', H);
-
-  // Single group that receives the zoom transform — everything zoomable goes inside
+  // Single group holding all map layers
   const g = svgSel.append('g').attr('class', 'map-g');
 
-  // Graticule inside g so it moves with countries on zoom/pan
+  if (is3D) {
+    // Globe-shaped ocean — only the sphere is water, background stays app-coloured
+    g.append('path').datum({type:'Sphere'}).attr('class', 'ocean-sphere').attr('d', pathGen);
+  } else {
+    // Flat map: ocean fills the full SVG behind the zoomable group
+    svgSel.insert('rect', '.map-g').attr('class', 'ocean').attr('width', W).attr('height', H);
+  }
+
+  // Graticule inside g so it moves with countries on zoom/pan/rotate
   const graticule = d3.geoGraticule()();
   g.append('path').datum(graticule).attr('class', 'graticule').attr('d', pathGen);
 
@@ -894,15 +952,48 @@ async function initMap() {
     .attr('class', 'sphere-outline')
     .attr('d', pathGen);
 
-  // Zoom & pan
-  zoomBehavior = d3.zoom()
-    .scaleExtent([1, 12])
-    .translateExtent([[0, 0], [W, H]])
-    .on('zoom', (event) => {
-      g.attr('transform', event.transform);
-    });
+  if (is3D) {
+    // 3D globe: drag rotates the sphere, wheel/buttons zoom by rescaling the projection
+    const redraw = () => g.selectAll('path').attr('d', pathGen);
 
-  svgSel.call(zoomBehavior);
+    let rotateStart, pointerStart;
+    const drag = d3.drag()
+      .on('start', (event) => {
+        rotateStart = projection.rotate();
+        pointerStart = [event.x, event.y];
+        hideTooltip();
+      })
+      .on('drag', (event) => {
+        const sensitivity = 75 / projection.scale();
+        const dx = event.x - pointerStart[0];
+        const dy = event.y - pointerStart[1];
+        projection.rotate([
+          rotateStart[0] + dx * sensitivity,
+          Math.max(-90, Math.min(90, rotateStart[1] - dy * sensitivity))
+        ]);
+        redraw();
+      });
+
+    zoomBehavior = d3.zoom()
+      .scaleExtent([0.8, 8])
+      .filter((event) => event.type === 'wheel')   // drag is reserved for rotation
+      .on('zoom', (event) => {
+        projection.scale(baseScale * event.transform.k);
+        redraw();
+      });
+
+    svgSel.call(drag).call(zoomBehavior).style('cursor', 'grab');
+  } else {
+    // Flat map: standard zoom & pan via group transform
+    zoomBehavior = d3.zoom()
+      .scaleExtent([1, 12])
+      .translateExtent([[0, 0], [W, H]])
+      .on('zoom', (event) => {
+        g.attr('transform', event.transform);
+      });
+
+    svgSel.call(zoomBehavior).style('cursor', null);
+  }
 }
 
 function zoomIn()    { svgSel && svgSel.transition().duration(300).call(zoomBehavior.scaleBy, 1.5); }
@@ -1058,6 +1149,7 @@ function toggleTheme() {
 
 // ─── Init ────────────────────────────────────────────────────────────────────
 buildList();
+syncModeButtons();
 initMap();
 
 let resizeTimer;
