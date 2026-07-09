@@ -17,7 +17,13 @@
     --bg-card: #161e2e;
     --bg-row-hover: #1a2540;
     --accent: #4f8ef7;
+    --accent-2: #8b5cf6;
     --accent-dim: rgba(79,142,247,0.15);
+    --success: #34d399;
+    --success-dim: rgba(52,211,153,0.14);
+    --danger: #f87171;
+    --danger-dim: rgba(248,113,113,0.14);
+    --gold: #fbbf24;
     --border: #1e2d48;
     --text-1: #e8edf5;
     --text-2: #7a8ba8;
@@ -49,7 +55,13 @@
     --bg-card: #e2eaf4;
     --bg-row-hover: #d4e2f0;
     --accent: #2563eb;
+    --accent-2: #7c3aed;
     --accent-dim: rgba(37,99,235,0.1);
+    --success: #059669;
+    --success-dim: rgba(5,150,105,0.1);
+    --danger: #dc2626;
+    --danger-dim: rgba(220,38,38,0.1);
+    --gold: #d97706;
     --border: #c5d5e8;
     --text-1: #0f172a;
     --text-2: #475569;
@@ -104,11 +116,19 @@
     align-items: center;
     gap: 8px;
     font-size: 15px;
-    font-weight: 700;
-    color: var(--text-1);
+    font-weight: 800;
     letter-spacing: 0.03em;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
   }
-  .title-row svg { width: 18px; height: 18px; color: var(--accent); flex-shrink: 0; }
+  .title-row svg {
+    width: 18px; height: 18px; color: var(--accent); flex-shrink: 0;
+    -webkit-text-fill-color: initial;
+    animation: globe-spin 24s linear infinite;
+  }
+  @keyframes globe-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
   .theme-toggle {
     display: flex;
@@ -163,13 +183,21 @@
     -webkit-app-region: no-drag;
   }
   .tab-btn svg { width: 15px; height: 15px; }
-  .tab-btn.active { background: var(--accent); color: #fff; box-shadow: 0 2px 12px rgba(79,142,247,0.35); }
+  .tab-btn.active {
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    color: #fff;
+    box-shadow: 0 2px 14px rgba(79,142,247,0.4);
+  }
   .tab-btn:not(.active):hover { background: var(--bg-card); color: var(--text-1); }
 
   /* ── Layout ── */
   .content { height: calc(100vh - var(--tab-h)); overflow: hidden; }
   .view { display: none; height: 100%; }
-  .view.active { display: flex; flex-direction: column; }
+  .view.active { display: flex; flex-direction: column; animation: view-in 0.22s ease; }
+  @keyframes view-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
 
   /* ── Map View ── */
   #map-view { background: var(--bg-app); position: relative; }
@@ -384,7 +412,7 @@
   .continent-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
   .continent-name { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-2); transition: color 0.12s; }
   .continent-count { font-size: 11px; color: var(--text-3); background: var(--bg-card); border-radius: 20px; padding: 1px 8px; }
-  .continent-arrow { margin-left: auto; color: var(--text-3); display: flex; align-items: center; transition: transform 0.2s ease; }
+  .continent-arrow { color: var(--text-3); display: flex; align-items: center; transition: transform 0.2s ease; }
   .continent-section:not(.collapsed) .continent-arrow { transform: rotate(180deg); }
 
   table {
@@ -406,6 +434,8 @@
   thead th:nth-child(1) { width: 52px; text-align: center; }
   thead th:nth-child(2) { width: 45%; }
   thead th:nth-child(3) { width: 55%; }
+  thead th:nth-child(4) { width: 72px; text-align: center; }
+  td:nth-child(4) { text-align: center; }
 
   tbody tr {
     border-bottom: 1px solid var(--border);
@@ -456,6 +486,217 @@
 
   /* no-results */
   .no-results { padding: 60px 0; text-align: center; color: var(--text-3); font-size: 14px; display: none; }
+
+  /* ── Learned tracking ── */
+  .learn-btn {
+    width: 26px; height: 26px;
+    border: 1.5px solid var(--border);
+    border-radius: 50%;
+    background: transparent;
+    color: transparent;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .learn-btn:hover { border-color: var(--success); color: var(--success); background: var(--success-dim); }
+  .learn-btn.learned { border-color: var(--success); background: var(--success); color: #fff; }
+  tr.row-learned .cell-text { opacity: 0.75; }
+
+  .continent-progress {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+    margin-right: 10px;
+  }
+  .progress-track {
+    width: 90px; height: 5px;
+    background: var(--bg-card);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--success), var(--accent));
+    border-radius: 3px;
+    transition: width 0.35s ease;
+  }
+  .progress-label { font-size: 10.5px; color: var(--text-2); font-weight: 600; white-space: nowrap; }
+
+  /* ── Quiz ── */
+  #quiz-view { background: var(--bg-app); overflow-y: auto; }
+  .quiz-container {
+    width: 100%;
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 36px 24px 48px;
+  }
+  .quiz-screen { animation: view-in 0.25s ease; }
+
+  .quiz-title { font-size: 26px; font-weight: 800; text-align: center; margin-bottom: 6px; }
+  .quiz-sub { font-size: 13.5px; color: var(--text-2); text-align: center; margin-bottom: 28px; }
+
+  .quiz-modes { display: flex; flex-direction: column; gap: 14px; }
+  .quiz-mode-card {
+    display: grid;
+    grid-template-columns: 56px 1fr auto;
+    grid-template-rows: auto auto;
+    align-items: center;
+    column-gap: 16px;
+    text-align: left;
+    padding: 18px 20px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    cursor: pointer;
+    transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
+    color: var(--text-1);
+  }
+  .quiz-mode-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--accent);
+    box-shadow: 0 6px 24px rgba(79,142,247,0.18);
+  }
+  .qm-emoji { grid-row: 1 / 3; font-size: 34px; text-align: center; }
+  .qm-name  { font-size: 15.5px; font-weight: 700; }
+  .qm-desc  { grid-column: 2; font-size: 12px; color: var(--text-2); margin-top: 3px; }
+  .qm-best  {
+    grid-row: 1 / 3;
+    font-size: 11.5px;
+    font-weight: 700;
+    color: var(--gold);
+    background: var(--bg-card);
+    border-radius: 10px;
+    padding: 5px 10px;
+    white-space: nowrap;
+  }
+
+  /* Question screen */
+  .quiz-topbar { display: flex; align-items: center; gap: 14px; margin-bottom: 30px; }
+  .quiz-quit {
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-2);
+    font-size: 12px;
+    font-weight: 600;
+    padding: 5px 12px;
+    border-radius: 14px;
+    cursor: pointer;
+  }
+  .quiz-quit:hover { color: var(--danger); border-color: var(--danger); background: var(--danger-dim); }
+  .quiz-progress {
+    flex: 1; height: 6px;
+    background: var(--bg-card);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .quiz-progress-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    border-radius: 3px;
+    transition: width 0.3s ease;
+  }
+  .quiz-qnum { font-size: 12.5px; font-weight: 700; color: var(--text-2); }
+  .quiz-streak {
+    font-size: 12.5px; font-weight: 700; color: var(--gold);
+    background: var(--bg-card);
+    padding: 4px 10px;
+    border-radius: 12px;
+  }
+  .quiz-streak.hot { animation: streak-pop 0.3s ease; }
+  @keyframes streak-pop { 50% { transform: scale(1.25); } }
+
+  .quiz-question { text-align: center; margin-bottom: 28px; }
+  .quiz-flag { font-size: 64px; line-height: 1; display: block; margin-bottom: 14px; }
+  .quiz-question h3 { font-size: 19px; font-weight: 700; line-height: 1.45; }
+
+  .quiz-options { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .quiz-option {
+    padding: 16px 18px;
+    background: var(--bg-panel);
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    color: var(--text-1);
+    font-size: 14.5px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.12s, border-color 0.12s, background 0.12s;
+    text-align: center;
+  }
+  .quiz-option:not(:disabled):hover { transform: translateY(-2px); border-color: var(--accent); background: var(--accent-dim); }
+  .quiz-option:disabled { cursor: default; }
+  .quiz-option.correct { border-color: var(--success); background: var(--success-dim); color: var(--success); animation: correct-pop 0.35s ease; }
+  .quiz-option.wrong   { border-color: var(--danger); background: var(--danger-dim); color: var(--danger); animation: wrong-shake 0.35s ease; }
+  .quiz-option.dimmed  { opacity: 0.45; }
+  @keyframes correct-pop { 40% { transform: scale(1.05); } }
+  @keyframes wrong-shake { 20%, 60% { transform: translateX(-6px); } 40%, 80% { transform: translateX(6px); } }
+
+  .quiz-feedback {
+    min-height: 54px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-top: 22px;
+    font-size: 14.5px;
+    font-weight: 700;
+  }
+  .quiz-feedback .fb-correct { color: var(--success); }
+  .quiz-feedback .fb-wrong   { color: var(--danger); }
+  .fb-speak {
+    display: inline-flex; align-items: center; gap: 5px;
+    border: 1px solid var(--border);
+    background: var(--bg-panel);
+    color: var(--text-2);
+    font-size: 11.5px; font-weight: 600;
+    padding: 5px 11px;
+    border-radius: 14px;
+    cursor: pointer;
+  }
+  .fb-speak:hover { color: var(--accent); border-color: var(--accent); }
+  .fb-speak.speaking { color: var(--accent); border-color: var(--accent); background: var(--accent-dim); }
+
+  /* Results screen */
+  #quiz-results { text-align: center; padding-top: 30px; }
+  .quiz-result-emoji { font-size: 72px; margin-bottom: 18px; animation: result-bounce 0.6s ease; }
+  @keyframes result-bounce {
+    0%   { transform: scale(0); }
+    60%  { transform: scale(1.2); }
+    100% { transform: scale(1); }
+  }
+  #result-score { font-size: 34px; font-weight: 800; margin-bottom: 8px; }
+  #result-message { font-size: 15px; color: var(--text-2); margin-bottom: 6px; }
+  #result-best { font-size: 13px; color: var(--gold); font-weight: 700; margin-bottom: 30px; }
+  .quiz-result-actions { display: flex; gap: 12px; justify-content: center; }
+  .quiz-primary-btn {
+    padding: 11px 26px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-2));
+    border: none;
+    border-radius: 12px;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .quiz-primary-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(79,142,247,0.35); }
+  .quiz-secondary-btn {
+    padding: 11px 26px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    color: var(--text-1);
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .quiz-secondary-btn:hover { border-color: var(--accent); }
 </style>
 </head>
 <body>
@@ -502,6 +743,14 @@
         <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>
       </svg>
       Country List
+    </button>
+    <button class="tab-btn" id="tab-quiz" onclick="switchTab('quiz')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/>
+        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/>
+        <line x1="12" y1="17" x2="12.01" y2="17"/>
+      </svg>
+      Quiz
     </button>
   </div>
 </header>
@@ -564,6 +813,67 @@
     </div>
     <div class="list-scroll" id="list-scroll">
       <div class="no-results" id="no-results">No countries match your search.</div>
+    </div>
+  </div>
+
+  <!-- QUIZ VIEW -->
+  <div class="view" id="quiz-view">
+    <div class="quiz-container">
+
+      <!-- Mode select -->
+      <div class="quiz-screen" id="quiz-home">
+        <h2 class="quiz-title">🎓 Test Your Knowledge</h2>
+        <p class="quiz-sub">Pick a challenge — 10 questions per round. Distractors come from the same continent, so stay sharp!</p>
+        <div class="quiz-modes">
+          <button class="quiz-mode-card" onclick="startQuiz('capital')">
+            <span class="qm-emoji">🏛️</span>
+            <span class="qm-name">Guess the Capital</span>
+            <span class="qm-desc">We show a country — you pick its capital city</span>
+            <span class="qm-best" id="best-capital">No best yet</span>
+          </button>
+          <button class="quiz-mode-card" onclick="startQuiz('country')">
+            <span class="qm-emoji">🌍</span>
+            <span class="qm-name">Guess the Country</span>
+            <span class="qm-desc">We show a capital — you pick which country it belongs to</span>
+            <span class="qm-best" id="best-country">No best yet</span>
+          </button>
+          <button class="quiz-mode-card" onclick="startQuiz('flag')">
+            <span class="qm-emoji">🚩</span>
+            <span class="qm-name">Guess the Flag</span>
+            <span class="qm-desc">We show a flag — you name the country</span>
+            <span class="qm-best" id="best-flag">No best yet</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Question -->
+      <div class="quiz-screen" id="quiz-play" style="display:none">
+        <div class="quiz-topbar">
+          <button class="quiz-quit" onclick="quitQuiz()">← Exit</button>
+          <div class="quiz-progress"><div class="quiz-progress-fill" id="quiz-progress-fill"></div></div>
+          <span class="quiz-qnum" id="quiz-qnum">1/10</span>
+          <span class="quiz-streak" id="quiz-streak">🔥 0</span>
+        </div>
+        <div class="quiz-question">
+          <span class="quiz-flag" id="quiz-flag"></span>
+          <h3 id="quiz-question-text"></h3>
+        </div>
+        <div class="quiz-options" id="quiz-options"></div>
+        <div class="quiz-feedback" id="quiz-feedback"></div>
+      </div>
+
+      <!-- Results -->
+      <div class="quiz-screen" id="quiz-results" style="display:none">
+        <div class="quiz-result-emoji" id="result-emoji"></div>
+        <h2 id="result-score"></h2>
+        <p id="result-message"></p>
+        <p id="result-best"></p>
+        <div class="quiz-result-actions">
+          <button class="quiz-primary-btn" onclick="startQuiz(lastQuizMode)">Play Again</button>
+          <button class="quiz-secondary-btn" onclick="showQuizHome()">Change Mode</button>
+        </div>
+      </div>
+
     </div>
   </div>
 </div>
@@ -1047,6 +1357,31 @@ function expandAll() {
   });
 }
 
+// Learned-country tracking, persisted across sessions
+let learned = new Set(JSON.parse(localStorage.getItem('wm-learned') || '[]'));
+
+function toggleLearned(iso2, btn) {
+  if (learned.has(iso2)) learned.delete(iso2);
+  else learned.add(iso2);
+  localStorage.setItem('wm-learned', JSON.stringify([...learned]));
+  btn.classList.toggle('learned', learned.has(iso2));
+  btn.closest('tr').classList.toggle('row-learned', learned.has(iso2));
+  refreshContinentProgress();
+}
+
+function refreshContinentProgress() {
+  for (const cont of CONTINENT_ORDER) {
+    const group = COUNTRIES.filter(c => c.continent === cont);
+    const done  = group.filter(c => learned.has(c.iso2)).length;
+    const section = document.querySelector(`.continent-section[data-continent="${cont}"]`);
+    if (!section) continue;
+    const fill  = section.querySelector('.progress-fill');
+    const label = section.querySelector('.progress-label');
+    if (fill)  fill.style.width = (done / group.length * 100) + '%';
+    if (label) label.textContent = `${done}/${group.length} learned`;
+  }
+}
+
 function buildList() {
   const scroll = document.getElementById('list-scroll');
   const sorted = [...COUNTRIES].sort((a,b) => a.name.localeCompare(b.name));
@@ -1057,7 +1392,6 @@ function buildList() {
     const group = sorted.filter(c => c.continent === cont);
     if (!group.length) continue;
     const color = CONTINENT_COLOR[cont] || '#888';
-    const cssClass = (CONTINENT_CLASS[cont] || 'c-unknown').replace('c-','');
 
     html += `
     <div class="continent-section collapsed" data-continent="${cont}">
@@ -1065,18 +1399,22 @@ function buildList() {
         <div class="continent-dot" style="background:${color}"></div>
         <span class="continent-name">${cont}</span>
         <span class="continent-count">${group.length}</span>
+        <span class="continent-progress">
+          <span class="progress-track"><span class="progress-fill"></span></span>
+          <span class="progress-label"></span>
+        </span>
         <span class="continent-arrow"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span>
       </div>
       <table>
-        <thead><tr><th>Flag</th><th>Country</th><th>Capital</th></tr></thead>
+        <thead><tr><th>Flag</th><th>Country</th><th>Capital</th><th title="Mark countries you know">Learned</th></tr></thead>
         <tbody>
     `;
 
     for (const c of group) {
       const flag = flagEmoji(c.iso2);
-      const cid  = `${c.iso2}`;
+      const isLearned = learned.has(c.iso2);
       html += `
-        <tr data-name="${c.name.toLowerCase()}" data-capital="${c.capital.toLowerCase()}">
+        <tr data-name="${c.name.toLowerCase()}" data-capital="${c.capital.toLowerCase()}" class="${isLearned ? 'row-learned' : ''}">
           <td>${flag}</td>
           <td>
             <div class="cell-with-mic">
@@ -1090,6 +1428,9 @@ function buildList() {
               <button class="mic-btn" title="Pronounce capital" onclick="speak('${c.capital.replace(/'/g,"\\'")}', this)">${MIC_SVG}</button>
             </div>
           </td>
+          <td>
+            <button class="learn-btn ${isLearned ? 'learned' : ''}" title="Mark as learned" onclick="toggleLearned('${c.iso2}', this)">✓</button>
+          </td>
         </tr>
       `;
     }
@@ -1098,6 +1439,7 @@ function buildList() {
 
   scroll.innerHTML = html;
   updateCount(COUNTRIES.length);
+  refreshContinentProgress();
 }
 
 function filterList() {
@@ -1132,6 +1474,175 @@ function updateCount(n) {
   document.getElementById('country-count').textContent = `${n} countr${n === 1 ? 'y' : 'ies'}`;
 }
 
+// ─── Quiz ────────────────────────────────────────────────────────────────────
+const QUIZ_LEN = 10;
+let quizState = null;
+let lastQuizMode = 'capital';
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+const QUIZ_MODES = {
+  capital: {
+    prompt:  c => `What is the capital of ${c.name}?`,
+    flag:    c => flagEmoji(c.iso2),
+    answer:  c => c.capital,
+    option:  c => c.capital,
+  },
+  country: {
+    prompt:  c => `${c.capital} is the capital of which country?`,
+    flag:    () => '🏛️',
+    answer:  c => c.name,
+    option:  c => c.name,
+  },
+  flag: {
+    prompt:  () => 'Which country does this flag belong to?',
+    flag:    c => flagEmoji(c.iso2),
+    answer:  c => c.name,
+    option:  c => c.name,
+  },
+};
+
+function getBestScores() {
+  return JSON.parse(localStorage.getItem('wm-quiz-best') || '{}');
+}
+
+function updateBestLabels() {
+  const best = getBestScores();
+  for (const mode of ['capital', 'country', 'flag']) {
+    const el = document.getElementById('best-' + mode);
+    el.textContent = best[mode] != null ? `🏆 Best: ${best[mode]}/${QUIZ_LEN}` : 'No best yet';
+  }
+}
+
+function showQuizScreen(id) {
+  for (const s of ['quiz-home', 'quiz-play', 'quiz-results']) {
+    document.getElementById(s).style.display = s === id ? '' : 'none';
+  }
+}
+
+function showQuizHome() {
+  if (quizState) { clearTimeout(quizState.timer); quizState = null; }
+  updateBestLabels();
+  showQuizScreen('quiz-home');
+}
+
+function quitQuiz() { showQuizHome(); }
+
+function startQuiz(mode) {
+  lastQuizMode = mode;
+  const questions = shuffle(COUNTRIES).slice(0, QUIZ_LEN).map(c => {
+    const pool = shuffle(COUNTRIES.filter(o => o.continent === c.continent && o.iso2 !== c.iso2)).slice(0, 3);
+    return { country: c, options: shuffle([c, ...pool]) };
+  });
+  quizState = { mode, questions, index: 0, score: 0, streak: 0, maxStreak: 0, timer: null };
+  showQuizScreen('quiz-play');
+  renderQuestion();
+}
+
+function renderQuestion() {
+  const { mode, questions, index, score, streak } = quizState;
+  const m = QUIZ_MODES[mode];
+  const q = questions[index];
+
+  document.getElementById('quiz-progress-fill').style.width = (index / QUIZ_LEN * 100) + '%';
+  document.getElementById('quiz-qnum').textContent = `${index + 1}/${QUIZ_LEN}`;
+  document.getElementById('quiz-streak').textContent = `🔥 ${streak}`;
+  document.getElementById('quiz-flag').textContent = m.flag(q.country);
+  document.getElementById('quiz-question-text').textContent = m.prompt(q.country);
+  document.getElementById('quiz-feedback').innerHTML = '';
+
+  const optsEl = document.getElementById('quiz-options');
+  optsEl.innerHTML = '';
+  for (const opt of q.options) {
+    const btn = document.createElement('button');
+    btn.className = 'quiz-option';
+    btn.textContent = m.option(opt);
+    btn.onclick = () => answerQuestion(opt, btn);
+    optsEl.appendChild(btn);
+  }
+}
+
+function answerQuestion(picked, btn) {
+  const { mode, questions, index } = quizState;
+  const m = QUIZ_MODES[mode];
+  const q = questions[index];
+  const correct = picked.iso2 === q.country.iso2;
+  const answerText = m.answer(q.country);
+
+  // Lock all options; highlight the outcome
+  const buttons = [...document.querySelectorAll('.quiz-option')];
+  buttons.forEach(b => {
+    b.disabled = true;
+    if (b.textContent === answerText) b.classList.add('correct');
+    else if (b === btn) b.classList.add('wrong');
+    else b.classList.add('dimmed');
+  });
+
+  const streakEl = document.getElementById('quiz-streak');
+  if (correct) {
+    quizState.score++;
+    quizState.streak++;
+    quizState.maxStreak = Math.max(quizState.maxStreak, quizState.streak);
+    streakEl.textContent = `🔥 ${quizState.streak}`;
+    streakEl.classList.remove('hot'); void streakEl.offsetWidth; streakEl.classList.add('hot');
+  } else {
+    quizState.streak = 0;
+    streakEl.textContent = '🔥 0';
+  }
+
+  // Feedback + pronunciation of the correct answer
+  const fb = document.getElementById('quiz-feedback');
+  fb.innerHTML = correct
+    ? `<span class="fb-correct">✓ Correct!</span>`
+    : `<span class="fb-wrong">✗ It's ${answerText}</span>`;
+  const speakBtn = document.createElement('button');
+  speakBtn.className = 'fb-speak';
+  speakBtn.textContent = '🔊 Hear it';
+  speakBtn.onclick = () => speak(answerText, speakBtn);
+  fb.appendChild(speakBtn);
+
+  quizState.timer = setTimeout(() => {
+    quizState.index++;
+    if (quizState.index >= QUIZ_LEN) finishQuiz();
+    else renderQuestion();
+  }, correct ? 1200 : 2200);
+}
+
+function finishQuiz() {
+  const { mode, score, maxStreak } = quizState;
+  const best = getBestScores();
+  const prevBest = best[mode] ?? -1;
+  const isNewBest = score > prevBest;
+  if (isNewBest) {
+    best[mode] = score;
+    localStorage.setItem('wm-quiz-best', JSON.stringify(best));
+  }
+
+  const tiers = [
+    [10, '🏆', 'Perfect score — geography master!'],
+    [8,  '🌟', 'Excellent! You really know your world.'],
+    [6,  '👍', 'Good job — solid knowledge!'],
+    [4,  '📚', 'Not bad — a little more practice!'],
+    [0,  '🌱', 'Every explorer starts somewhere. Try again!'],
+  ];
+  const [, emoji, message] = tiers.find(([min]) => score >= min);
+
+  document.getElementById('result-emoji').textContent = emoji;
+  document.getElementById('result-score').textContent = `${score}/${QUIZ_LEN}`;
+  document.getElementById('result-message').textContent = `${message}  ·  Longest streak: ${maxStreak}`;
+  document.getElementById('result-best').textContent = isNewBest
+    ? '🎉 New personal best!'
+    : (prevBest >= 0 ? `Personal best: ${prevBest}/${QUIZ_LEN}` : '');
+  showQuizScreen('quiz-results');
+}
+
 // ─── Theme ───────────────────────────────────────────────────────────────────
 function toggleTheme() {
   const html    = document.documentElement;
@@ -1150,6 +1661,7 @@ function toggleTheme() {
 // ─── Init ────────────────────────────────────────────────────────────────────
 buildList();
 syncModeButtons();
+updateBestLabels();
 initMap();
 
 let resizeTimer;
