@@ -1,6 +1,6 @@
 {
   "name": "worldmap",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Interactive world map with country info and pronunciation",
   "main": "main.js",
   "scripts": {
